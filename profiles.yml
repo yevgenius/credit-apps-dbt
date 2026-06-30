@@ -1,0 +1,25 @@
+# Example profiles.yml for running this project locally against DuckDB.
+# Copy to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR to this repo).
+#
+# Swap the `type`/connection block for your real warehouse (Snowflake, BigQuery,
+# Redshift, etc.) in production - nothing in the models is DuckDB-specific.
+
+
+credit_applications:
+  config:
+    send_anonymous_usage_stats: False
+  target: dev
+  outputs:
+    # dev.duckdb is what the VS Code dbt LSP server connects to (it's the
+    # default target, and the LSP holds an exclusive write lock on it the
+    # entire time VS Code is open).
+    dev:
+      type: duckdb
+      path: dev.duckdb
+      threads: 4
+    # cli.duckdb is a separate file for CLI dbt commands (run, test, seed) so
+    # they don't fight the LSP for the lock on dev.duckdb. Use `--target cli`.
+    cli:
+      type: duckdb
+      path: cli.duckdb
+      threads: 4

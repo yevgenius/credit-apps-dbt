@@ -1,0 +1,46 @@
+name: "credit_applications"
+version: "1.0.0"
+config-version: 2
+
+profile: "credit_applications"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["queries"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+seeds:
+  credit_applications:
+    +schema: seeds
+    raw_applications:
+      +column_types:
+        requested_amount: numeric
+    raw_application_status_events:
+      +column_types:
+        status_at: timestamp
+
+models:
+  credit_applications:
+    +materialized: view
+    staging:
+      +schema: staging
+    intermediate:
+      +materialized: ephemeral
+    marts:
+      +materialized: table
+      +schema: marts
+
+vars:
+  # Assumption: an application with no terminal event (FUNDED/WITHDRAWN/EXPIRED) and
+  # no activity in this many days is "stale" rather than genuinely "in progress".
+  # Surfaced as a flag in fct_applications, not enforced as a hard test.
+  stale_application_days: 14
+
+  # Lookback window for incremental runs of fct_applications. Applications with
+  # event activity within this many days of the table's high-water mark are
+  # reprocessed on each run. Widen if upstream systems have longer delivery delays.
+  incremental_lookback_days: 3

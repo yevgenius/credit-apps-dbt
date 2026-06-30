@@ -1,0 +1,120 @@
+version: 2
+
+models:
+  - name: fct_applications
+    description: >
+      One row per application_id. Primary table for funnel/conversion/cycle-time
+      reporting. Build dashboards on this, not on the staging or intermediate
+      models.
+    columns:
+      - name: application_id
+        tests:
+          - unique
+          - not_null
+      - name: current_status
+        tests:
+          - not_null
+      - name: submitted_at
+        tests:
+          - not_null
+          - no_volume_anomaly:
+              arguments:
+                column_name: submitted_at
+                lookback_days: 14
+                stddev_threshold: 3
+              config:
+                severity: warn
+                # See macros/test_no_volume_anomaly.sql for why this is
+                # mostly inert against 3 weeks of seed data - it's wired up
+                # correctly for production, not tuned to fire here.
+      - name: furthest_stage_reached
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['SUBMITTED', 'UNDERWRITING', 'DECISIONED', 'FUNDED']
+              # 'UNKNOWN' deliberately excluded - if it ever appears, that's
+              # an application with zero events, which should fail this test
+              # and get investigated, not get silently bucketed.
+      - name: final_decision_outcome
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['APPROVED', 'DECLINED']
+              config:
+                where: "final_decision_outcome is not null"
+      - name: is_funded
+        tests:
+          - not_null
+      - name: is_terminal
+        tests:
+          - not_null
+
+      # --- cross-field sequencing checks: catch the "clock skew" class of
+      # bug where a downstream system timestamps an event before its
+      # logical predecessor (see APP-0018 in seed data, included on purpose
+      # to demonstrate this firing - hence severity: warn, not error).
+      - name: hours_submitted_to_underwriting
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+              config:
+                where: "hours_submitted_to_underwriting is not null"
+                severity: warn
+      - name: hours_underwriting_to_decision
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+              config:
+                where: "hours_underwriting_to_decision is not null"
+                severity: warn
+      - name: hours_decision_to_funded
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+              config:
+                where: "hours_decision_to_funded is not null"
+                severity: warn
+                # APP-0018 trips this on purpose - funded_at logged 3 hours
+                # before final_decision_at due to a simulated clock-skew bug.
+
+    tests:
+      # A funded application must have a decision, and that decision must be
+      # APPROVED - funding a declined application is a hard business-rule
+      # violation, not just a timestamp nit, so this one stays at error.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_declined = false"
+          config:
+            where: "is_funded = true"
+
+      # An application can't be both declined and withdrawn in our model -
+      # decisioning and withdrawal are mutually exclusive terminal paths.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "not (is_declined and is_withdrawn)"
+
+  - name: fct_application_status_events
+    description: One row per status-change event, atomic grain, for event-level analysis.
+    columns:
+      - name: event_id
+        tests:
+          - unique
+          - not_null
+      - name: application_id
+        tests:
+          - not_null
+      - name: event_sequence_number
+        tests:
+          - not_null
+
+  - name: dim_products
+    description: Product reference dimension.
+    columns:
+      - name: product_type
+        tests:
+          - unique
+          - not_null

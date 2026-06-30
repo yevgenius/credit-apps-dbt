@@ -1,0 +1,88 @@
+version: 2
+
+models:
+  - name: stg_applications
+    description: One row per application, with static/application-level attributes. Status history lives in stg_application_status_events.
+    columns:
+      - name: application_id
+        description: Primary key.
+        tests:
+          - unique
+          - not_null
+      - name: applicant_id
+        tests:
+          - not_null
+      - name: product_type
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_type
+      - name: channel
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['web', 'mobile', 'branch', 'partner']
+      - name: requested_amount
+        description: Nullable - not every channel captures this at submission time (e.g. partner referrals).
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+              config:
+                where: "requested_amount is not null"
+      - name: created_at
+        tests:
+          - not_null
+
+  - name: stg_application_status_events
+    description: One row per status-change event. Multiple events per application_id are expected (that's the point) - do not assume uniqueness on application_id.
+    columns:
+      - name: event_id
+        description: Primary key at the event grain.
+        tests:
+          - unique
+          - not_null
+      - name: application_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_applications')
+                field: application_id
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['SUBMITTED', 'UNDERWRITING', 'DECISIONED', 'FUNDED', 'WITHDRAWN', 'EXPIRED']
+      - name: status_at
+        tests:
+          - not_null
+      - name: decision_outcome
+        description: Only populated when status = DECISIONED.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['APPROVED', 'DECLINED']
+              config:
+                where: "decision_outcome is not null"
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "is not null"
+              config:
+                where: "status = 'DECISIONED'"
+                severity: warn
+                # warn, not error: a DECISIONED event missing its outcome is a real
+                # upstream bug worth knowing about, but shouldn't block a build.
+
+  - name: stg_products
+    description: Product reference dimension. is_active = false products are configured but not yet receiving applications.
+    columns:
+      - name: product_type
+        tests:
+          - unique
+          - not_null

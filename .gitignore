@@ -1,0 +1,7 @@
+target/
+dbt_packages/
+logs/
+*.duckdb
+.DS_Store
+__pycache__/
+dbt_internal_packages/

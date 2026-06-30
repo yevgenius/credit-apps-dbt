@@ -1,0 +1,12 @@
+{
+    "sqltools.connections": [
+        {
+            "name": "DuckDBCli",
+            "accessMode": "Read Only",
+            "previewLimit": 100,
+            "driver": "DuckDB",
+            "databaseFilePath": "/Users/ykhodork/git/credit-apps-dbt/cli.duckdb"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}

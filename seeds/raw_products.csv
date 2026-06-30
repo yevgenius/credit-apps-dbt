@@ -1,0 +1,3 @@
+product_type,product_name,product_category,min_amount,max_amount,is_active
+personal_loan,Personal Loan,consumer_lending,1000,50000,true
+hardship_loan,hardship loan,secured_lending,5000,75000,false
