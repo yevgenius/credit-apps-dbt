@@ -201,7 +201,7 @@ dbt seed   # load seed CSVs into DuckDB (creates cli.duckdb on first run)
 **First run** (builds everything from scratch):
 
 ```bash
-dbt run
+dbt build
 ```
 
 **Subsequent runs** (incremental — only reprocesses applications with recent
