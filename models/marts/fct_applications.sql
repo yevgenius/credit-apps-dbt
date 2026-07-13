@@ -7,15 +7,17 @@
 -- more resilient to replays/backfills than a single overwritten column would
 -- be (see README "Resilience" section).
 --
--- Incremental strategy: delete+insert on application_id. On each run only
+-- Incremental strategy: merge on application_id. On each run only
 -- applications with event activity in the last `incremental_lookback_days`
 -- days are reprocessed. The lookback window (default 3 days) absorbs
 -- late-arriving events; widen it if upstream systems have longer delays.
+-- merge (not delete+insert) so this runs unmodified on Redshift, Snowflake,
+-- and BigQuery - BigQuery doesn't support delete+insert at all.
 -- depends_on: {{ ref('stg_application_status_events') }}
 {{ config(
     materialized='incremental',
     unique_key='application_id',
-    incremental_strategy='delete+insert',
+    incremental_strategy='merge',
     on_schema_change='sync_all_columns'
 ) }}
 

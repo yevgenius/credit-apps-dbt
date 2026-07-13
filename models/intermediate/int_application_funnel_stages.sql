@@ -4,13 +4,15 @@
 -- means adding one new max(case when status = '...') line here and to the
 -- accepted_values list in staging - no other model changes.
 --
--- Incremental strategy: delete+insert on application_id. The recently_active
+-- Incremental strategy: merge on application_id. The recently_active
 -- CTE applies the lookback filter before the group-by and the latest_event
 -- window function, so neither runs over the full event table on each run.
+-- merge (not delete+insert) so this runs unmodified on Redshift, Snowflake,
+-- and BigQuery - BigQuery doesn't support delete+insert at all.
 {{ config(
     materialized='incremental',
     unique_key='application_id',
-    incremental_strategy='delete+insert'
+    incremental_strategy='merge'
 ) }}
 
 with recently_active as (
